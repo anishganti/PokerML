@@ -11,6 +11,7 @@ ranks = ('Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', "Queen", '
 points = {'Ace': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
           '8': 8, '9': 9, '10': 10, 'Jack': 11, 'Queen': 12, 'King': 13}
 
+global betSet
 
 class Card:
     # Create card class
@@ -58,6 +59,7 @@ class Table:
         self.communityCards = []
         # Create a pot of money
         self.pot = 0
+        self.currentBet = 0
 
     def addCard(self, card):
         # Add card to community board
@@ -76,10 +78,17 @@ class Table:
         # Add money to pot
         self.pot += money
 
-    def setPot(self, price):
-        # Set pot to price
-        self.pot = price
+    def raiseBet(self, price):
+        # Increase current bet by price
+        self.currentBet += price
 
+    def setBet(self, price):
+        # Set bet to price
+        self.currentBet = price
+
+    def getBet(self):
+        # return bet
+        return self.currentBet
 
 class Player(object):
     # Player is computer object
@@ -87,8 +96,9 @@ class Player(object):
         # Create a 'hand' and a pool
         self.name = name
         self.hand = []
-        self.money = 1000
-        self.moves = ("fold", "raise", "call", "bet")
+        self.money = 100
+        self.preBet_moves = ("check", "bet")
+        self.postBet_moves = ("fold", "raise", "call")
 
     def addHand(self, card):
         # Add card to hand
@@ -103,9 +113,34 @@ class Player(object):
         self.money -= money
         table.addPot(money)
 
-    def makeMove(self):
-        move = random.choice(self.moves)
-        pass
+    def makeMove(self, isBetSet, table, players):
+        if not isBetSet:
+            move = random.choice(self.preBet_moves)
+            if move == "check":
+                pass
+            else:
+                print("Computer bets $2")
+                table.setBet(2)
+                self.betMoney(table, table.getBet())
+                betSet = True
+        else:
+            move = random.choice(self.postBet_moves)
+            if move == "fold":
+                # automatic win for user
+                for player in players:
+                    if player.getName() == "Bot":
+                        players.remove(player)
+                print("Computer folds, you win.")
+                getWinner(players, table)
+            if move == "call":
+                # current bet remains same, add current bet to pot
+                print("Computer calls.")
+                self.betMoney(table, table.getBet())
+            if move == "raise":
+                # increase bet
+                print("Computer raises by $2")
+                table.raiseBet(2)
+                self.betMoney(table, table.getBet())
 
     def getName(self):
         # Return player name
@@ -118,9 +153,29 @@ class User(Player):
         # Create a 'hand' and a pool
         super().__init__(input("Your Name: "))
 
-    def makeMove(self):
-        move = input("What is your move:")
-        pass
+
+def postBlinds(players, table):
+    # Post small blind and big blind two player
+    print("Pre-determined blinds, Small Blind is $1, Big Blind is $2")
+    players[0].betMoney(table=table, money=1)
+    table.raiseBet(1)
+    players[1].betMoney(table=table, money=2)
+    table.raiseBet(1)
+
+
+def dealHoleCards(deck, players):
+    # Deal 2 'hole' cards at beginning of game
+    for player in players:
+        for i in range(2):
+            player.addHand(deck.getCard())
+
+
+def preFlop(players, table):
+    # Betting before the Flop
+    for player in players:
+        player.makeMove(True, table, players)
+    # Reverse so that next round Big Blind goes first
+    players.reverse()
 
 
 def communityFlop(deck, board):
@@ -139,21 +194,6 @@ def communityRiver(deck, board):
     board.addCard(deck.getCard())
 
 
-def dealHoleCards(deck, players):
-    # Deal 2 'hole' cards at beginning of game
-    for player in players:
-        for i in range(2):
-            player.addHand(deck.getCard())
-
-
-def postBlinds(players, table):
-    # Post small blind and big blind two player
-    players[1].betMoney(table, money=int(input("Small Blind: ")))
-    players[0].betMoney(table, money=int(input("Big Blind ")))
-    # Reverse so that next round blinds are reversed
-    players.reverse()
-
-
 def getWinner(players, table):
     maxi = 0
     name = ""
@@ -162,7 +202,7 @@ def getWinner(players, table):
         maxi = score if score > maxi else maxi
         name = player.getName() if maxi == score else name
     print(name)
-    print(score)
+    print(maxi)
 
 
 def getScores(player, table):
@@ -206,7 +246,7 @@ def evaluateScore(hands):
 
     # Check for full house
     if ((cards[0].getPoints() == cards[1].getPoints() and cards[2].getPoints() == cards[4].getPoints()) or
-        (cards[0].getPoints() == cards[2].getPoints() and cards[3].getPoints() == cards[4].getPoints())):
+            (cards[0].getPoints() == cards[2].getPoints() and cards[3].getPoints() == cards[4].getPoints())):
         return 7
 
     if isFlush:
@@ -217,12 +257,12 @@ def evaluateScore(hands):
 
     # Check for three of a kind, only three ways
     if cards[0].getPoints() == cards[2].getPoints() or (cards[1].getPoints() == cards[3].getPoints()
-       or cards[2].getPoints() == cards[4].getPoints()):
+                                                        or cards[2].getPoints() == cards[4].getPoints()):
         return 4
 
     # Check for two pairs, only two ways
     if ((cards[0].getPoints() == cards[1].getPoints() and cards[2].getPoints() == cards[3].getPoints()) or
-        (cards[1].getPoints() == cards[2].getPoints() and cards[3].getPoints() == cards[4].getPoints())):
+            (cards[1].getPoints() == cards[2].getPoints() and cards[3].getPoints() == cards[4].getPoints())):
         return 3
 
     # Check for a single pair
@@ -237,26 +277,35 @@ def evaluateScore(hands):
 def main():
     # Main method and logic
     # Initialize all objects
+    betSet = False
     deck = Deck()
     deck.shuffleDeck()
     table = Table()
     players = [Player("Bot"), User()]
+    # Random order
+    random.shuffle(players)
+    # Post Blinds
+    postBlinds(players, table)
     # Deal hole cards
     dealHoleCards(deck, players)
     # Pre-flop Betting
-    postBlinds(players, table)
+    preFlop(players, table)
     # Flop
     communityFlop(deck, table)
+    betSet = False
     for player in players:
-        player.makeMove()
+        player.makeMove(betSet, table, players)
     # Turn
     communityTurn(deck, table)
+    betSet = False
     for player in players:
-        player.makeMove()
+        player.makeMove(betSet, table, players)
     # River
     communityRiver(deck, table)
+    betSet = False
     for player in players:
-        player.makeMove()
+        player.makeMove(betSet, table, players)
     getWinner(players, table)
+
 
 main()
