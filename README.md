@@ -1,2 +1,2 @@
 # PokerML
-Machine Learning Poker program in which the copmuter uses probability and statistical models to predict optimal moves
+Machine learning poker program in which the computer uses probability and statistical models for betting strategies and to predict optimal moves. 
