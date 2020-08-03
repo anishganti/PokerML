@@ -11,7 +11,8 @@ ranks = ('Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', "Queen", '
 points = {'Ace': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
           '8': 8, '9': 9, '10': 10, 'Jack': 11, 'Queen': 12, 'King': 13}
 
-global betSet
+betFlag = False;
+
 
 class Card:
     # Create card class
@@ -90,6 +91,7 @@ class Table:
         # return bet
         return self.currentBet
 
+
 class Player(object):
     # Player is computer object
     def __init__(self, name):
@@ -113,16 +115,18 @@ class Player(object):
         self.money -= money
         table.addPot(money)
 
-    def makeMove(self, isBetSet, table, players):
-        if not isBetSet:
+    def makeMove(self, table, players):
+        global betFlag
+        if not betFlag:
             move = random.choice(self.preBet_moves)
             if move == "check":
+                print("Computer checks.")
                 pass
             else:
                 print("Computer bets $2")
                 table.setBet(2)
                 self.betMoney(table, table.getBet())
-                betSet = True
+                betFlag = True
         else:
             move = random.choice(self.postBet_moves)
             if move == "fold":
@@ -153,6 +157,42 @@ class User(Player):
         # Create a 'hand' and a pool
         super().__init__(input("Your Name: "))
 
+    def makeMove(self, table, players):
+        global betFlag
+        if not betFlag:
+            while 1:
+                move = input(self.getName() + "'s move: ").lower()
+                if move == "check":
+                    print(self.getName() + " checks.")
+                    break
+                else:
+                    print(self.getName() + " bets $2.")
+                    table.setBet(2)
+                    self.betMoney(table, table.getBet())
+                    betFlag = True
+                    break
+        else:
+            while 1:
+                move = input(self.getName() + "'s move: ").lower()
+                if move == "fold":
+                    # automatic win for user
+                    for player in players:
+                        if player.getName() == self.getName():
+                            players.remove(player)
+                    print(self.getName() + " folds, Bot wins.")
+                    getWinner(players, table)
+                if move == "call":
+                    # current bet remains same, add current bet to pot
+                    print(self.getName() + " calls.")
+                    self.betMoney(table, table.getBet())
+                    break
+                if move == "raise":
+                    # increase bet
+                    print(self.getName() + " raises by $2.")
+                    table.raiseBet(2)
+                    self.betMoney(table, table.getBet())
+                    break
+
 
 def postBlinds(players, table):
     # Post small blind and big blind two player
@@ -172,8 +212,10 @@ def dealHoleCards(deck, players):
 
 def preFlop(players, table):
     # Betting before the Flop
+    global betFlag
+    betFlag = True
     for player in players:
-        player.makeMove(True, table, players)
+        player.makeMove(table, players)
     # Reverse so that next round Big Blind goes first
     players.reverse()
 
@@ -203,6 +245,7 @@ def getWinner(players, table):
         name = player.getName() if maxi == score else name
     print(name)
     print(maxi)
+    exit()
 
 
 def getScores(player, table):
@@ -275,9 +318,10 @@ def evaluateScore(hands):
 
 
 def main():
+    global betFlag
     # Main method and logic
     # Initialize all objects
-    betSet = False
+    betFlag = False
     deck = Deck()
     deck.shuffleDeck()
     table = Table()
@@ -292,19 +336,19 @@ def main():
     preFlop(players, table)
     # Flop
     communityFlop(deck, table)
-    betSet = False
+    betFlag = False
     for player in players:
-        player.makeMove(betSet, table, players)
+        player.makeMove(table, players)
     # Turn
     communityTurn(deck, table)
-    betSet = False
+    betFlag = False
     for player in players:
-        player.makeMove(betSet, table, players)
+        player.makeMove(table, players)
     # River
     communityRiver(deck, table)
-    betSet = False
+    betFlag = False
     for player in players:
-        player.makeMove(betSet, table, players)
+        player.makeMove(table, players)
     getWinner(players, table)
 
 
